@@ -70,7 +70,7 @@ dictConfig({
     'handlers': {
         'logfire': {'class': 'logfire.LogfireLoggingHandler'},
     },
-    'root': {'handlers': ['logfire']},
+    'root': {'level': 'INFO', 'handlers': ['logfire']},
 })
 ```
 
