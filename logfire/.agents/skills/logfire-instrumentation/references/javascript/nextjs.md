@@ -165,7 +165,7 @@ export function ClientInstrumentation() {
 
 Mount this component once at the app root and do not return the asynchronous SDK cleanup from its effect. The ref prevents React Strict Mode's development-only second effect setup from configuring Logfire twice. Tests, previews, or app shells that replace the whole telemetry setup should await the cleanup returned by `configure()` before configuring a replacement.
 
-If importing the component from server-rendered code, use `next/dynamic` with `ssr: false`.
+Import this Client Component normally from an App Router Server Component. If the app needs `next/dynamic` with `ssr: false`, put that dynamic import in another Client Component; Next.js rejects `ssr: false` directly in a Server Component.
 
 ## Vercel Deployment Notes
 

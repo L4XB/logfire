@@ -163,15 +163,16 @@ Use these references:
 
 ```toml
 [dependencies]
-logfire = "0.6"
+logfire = "0.12"
 ```
 
 #### Configure
 
 ```rust
-let shutdown_handler = logfire::configure()
-    .install_panic_handler()
-    .finish()?;
+let shutdown_guard = logfire::configure()
+    .with_install_panic_handler(true)
+    .finish()?
+    .shutdown_guard();
 ```
 
 Set `LOGFIRE_TOKEN` in your environment, or don't — the `logfire` crate's `data-dir` feature (on by default) falls back to `.logfire/logfire_credentials.json` when it's unset, same as Python. Set it explicitly only to override that: a different token, or production, where it should be a separately-minted token per [Authenticate and Select the Exact Project](#authenticate-and-select-the-exact-project)'s "If the calling skill needs a write token" section, not the local one.
@@ -190,7 +191,7 @@ logfire::span!("processing order", order_id = order_id).in_scope(|| {
 logfire::info!("Created user {user_id}", user_id = uid);
 ```
 
-Always call `shutdown_handler.shutdown()` before program exit to flush data.
+Keep the guard on `main`'s stack so unwinding panics flush captured telemetry. Call `shutdown_guard.shutdown()` before a normal program exit to surface any shutdown error.
 
 ### Other Languages (Go, Java, .NET, PHP, Ruby, ...)
 

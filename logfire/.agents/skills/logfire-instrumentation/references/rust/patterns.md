@@ -36,13 +36,14 @@ do_work();
 use logfire;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let shutdown_handler = logfire::configure()
-        .install_panic_handler()  // captures panics as error spans
-        .finish()?;
+    let shutdown_guard = logfire::configure()
+        .with_install_panic_handler(true)  // captures panics as error spans
+        .finish()?
+        .shutdown_guard();
 
     // application code...
 
-    shutdown_handler.shutdown()?;  // flush all pending spans
+    shutdown_guard.shutdown()?;  // flush all pending spans
     Ok(())
 }
 ```
@@ -90,17 +91,17 @@ Always call `shutdown()` before program exit to flush pending data:
 
 ```rust
 // In main()
-let shutdown_handler = logfire::configure().finish()?;
+let shutdown_guard = logfire::configure().finish()?.shutdown_guard();
 
 // ... app runs ...
 
 // Before exit
-shutdown_handler.shutdown()?;
+shutdown_guard.shutdown()?;
 ```
 
 For web servers using `tokio`, handle shutdown via signal:
 
 ```rust
 tokio::signal::ctrl_c().await?;
-shutdown_handler.shutdown()?;
+shutdown_guard.shutdown()?;
 ```

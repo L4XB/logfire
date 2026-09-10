@@ -172,6 +172,29 @@ def test_browser_and_python_logging_lifecycle_guidance_is_non_destructive() -> N
     assert "'disable_existing_loggers': False" in logging
 
 
+def test_framework_guidance_uses_supported_shutdown_and_authentication_shapes() -> None:
+    """Generated setup must use public APIs without invalid auth decoration or imports."""
+    references = SKILLS_ROOT / 'logfire-instrumentation' / 'references'
+    nextjs = (references / 'javascript/nextjs.md').read_text(encoding='utf-8')
+    assert 'Import this Client Component normally' in nextjs
+    assert 'put that dynamic import in another Client Component' in nextjs
+
+    rust = (references / 'rust/patterns.md').read_text(encoding='utf-8')
+    instrumentation = (SKILLS_ROOT / 'logfire-instrumentation' / 'SKILL.md').read_text(encoding='utf-8')
+    for source in (rust, instrumentation):
+        assert '.shutdown_guard()' in source
+        assert 'shutdown_guard.shutdown()' in source
+        assert '.with_install_panic_handler(true)' in source
+        assert '.install_panic_handler()' not in source
+    assert 'logfire = "0.12"' in instrumentation
+
+    collector = (
+        SKILLS_ROOT / 'logfire-infrastructure' / 'references' / 'collector' / 'host-and-infra-metrics.md'
+    ).read_text(encoding='utf-8')
+    assert "Authorization: '${env:LOGFIRE_TOKEN}'" in collector
+    assert 'Bearer ${env:LOGFIRE_TOKEN}' not in collector
+
+
 def test_build_rewrites_public_links_only_for_inlined_skills() -> None:
     compact = build(include_references=False)
 
