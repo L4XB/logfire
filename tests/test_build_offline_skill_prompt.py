@@ -1,11 +1,12 @@
 import re
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from scripts.build_offline_skill_prompt import (
     MANDATORY_REFERENCES,
     PUBLIC_SKILLS_ROOT,
     SKILL_ORDER,
     SKILLS_ROOT,
+    _reference_anchor,  # pyright: ignore[reportPrivateUsage]
     _rewrite_public_links_for_offline_bundle,  # pyright: ignore[reportPrivateUsage]
     build,
 )
@@ -23,7 +24,7 @@ CHECKED_IN_BUNDLE = SKILLS_ROOT / 'logfire-setup-offline.md'
 # sequence -- an earlier version chained them (`(?:\.\./[a-z0-9-]+/)?\./?references/...`),
 # which made a literal `.` mandatory right before `references/` and so never matched a
 # cross-skill link at all (nothing follows `../logfire-x/` but `references/` directly).
-REFERENCE_LINK = re.compile(r'\[[^\]]+\]\(((?:\.\./[a-z0-9-]+/)?(?:\./)?references/[\w./-]+\.md)(?:#[^)\s]*)?\)')
+REFERENCE_LINK = re.compile(r'\[[^\]]+\]\((\.\.?/[^)#\s]+\.md)(?:#[^)\s]*)?\)')
 
 
 def _appendix_headings(bundle: str) -> set[str]:
@@ -64,23 +65,49 @@ def test_full_build_has_no_dead_reference_links() -> None:
     assert headings, 'full build produced no Reference Files appendix at all'
     assert '[credential handoff instructions](#if-the-calling-skill-needs-a-write-token-not-just-a-cli-session)' in full
 
-    for link_path in REFERENCE_LINK.findall(full):
-        # Normalize `./references/x.md` and `../logfire-instrumentation/references/x.md`
-        # to the SKILLS_ROOT-relative form the appendix headings use.
-        normalized = link_path.removeprefix('./')
-        if not normalized.startswith('../'):
-            # `./references/...` is relative to the skill the link lives in; since every
-            # `## heading` is already skill-qualified, resolving this one exactly requires
-            # knowing which skill's body it came from. Conservatively accept it if ANY
-            # skill's `references/{rest}` is a real appendix heading -- still catches a
-            # reference renamed or deleted everywhere, which is the failure that matters.
-            rest = normalized.removeprefix('references/')
-            assert any(h.endswith(f'/references/{rest}') for h in headings), (
-                f'{link_path!r} does not resolve to any appendix entry (have: {sorted(headings)})'
-            )
-            continue
-        resolved = normalized.removeprefix('../')
-        assert resolved in headings, f'{link_path!r} -> {resolved!r} not in appendix (have: {sorted(headings)})'
+    assert not REFERENCE_LINK.findall(full), 'full build left filesystem-relative reference links unresolved'
+
+    for heading in headings:
+        assert f'<a id="{_reference_anchor(heading)}"></a>' in full
+    anchors = [_reference_anchor(heading) for heading in headings]
+    assert len(anchors) == len(set(anchors)), 'reference paths produced colliding appendix anchors'
+
+
+def test_reference_links_inside_appendix_resolve_to_inlined_anchors() -> None:
+    """Sibling and parent-relative links must not escape the flattened offline bundle."""
+    references = frozenset(
+        {
+            'logfire-instrumentation/references/auth.md',
+            'logfire-instrumentation/references/javascript/ai-sdk.md',
+            'logfire-instrumentation/references/javascript/node-runtime.md',
+        }
+    )
+    source = '[Node](./node-runtime.md) and [auth](../auth.md)'
+
+    rewritten = _rewrite_public_links_for_offline_bundle(
+        source,
+        source_path=PurePosixPath('logfire-instrumentation/references/javascript/ai-sdk.md'),
+        bundled_references=references,
+    )
+
+    assert rewritten == (
+        '[Node](#reference-logfire-instrumentation-references-javascript-node-runtime-md) and '
+        '[auth](#reference-logfire-instrumentation-references-auth-md)'
+    )
+
+
+def test_nextjs_browser_proxy_example_fails_closed() -> None:
+    """The setup prompt must not publish an unauthenticated credentialed proxy."""
+    nextjs = (SKILLS_ROOT / 'logfire-instrumentation' / 'references' / 'javascript' / 'nextjs.md').read_text(
+        encoding='utf-8'
+    )
+
+    assert "return false // Replace with the app's existing server-side authentication." in nextjs
+    assert "return false // Replace with the app's existing server-side rate limiter." in nextjs
+    for status in (401, 403, 429):
+        assert f'status: {status}' in nextjs
+    assert 'new Headers(request.headers)' not in nextjs
+    assert "['content-type', 'content-encoding']" in nextjs
 
 
 def test_build_rewrites_public_links_only_for_inlined_skills() -> None:

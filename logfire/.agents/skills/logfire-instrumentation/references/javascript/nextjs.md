@@ -74,21 +74,46 @@ npm install @pydantic/logfire-browser @opentelemetry/auto-instrumentations-web
 
 Create a proxy file in the project root or `src` directory. For Next.js 16 and later use `proxy.ts`. For older apps that already use `middleware.ts`, follow the existing file convention unless the app has migrated to `proxy.ts`.
 
+The proxy below fails closed until you connect its two adapter functions to the app's existing server-side authentication and rate limiter. Do not replace either `return false` with `return true`. If the app has no authentication or rate limiter to reuse, stop at server-side tracing and explain why browser tracing was not added.
+
 ```ts
 // proxy.ts
 import { NextRequest, NextResponse } from 'next/server'
 
-export default function proxy(request: NextRequest) {
+async function isAuthenticated(request: NextRequest): Promise<boolean> {
+  void request
+  return false // Replace with the app's existing server-side authentication.
+}
+
+async function isWithinTelemetryLimit(request: NextRequest): Promise<boolean> {
+  void request
+  return false // Replace with the app's existing server-side rate limiter.
+}
+
+export default async function proxy(request: NextRequest) {
   const url = request.nextUrl.clone()
 
   if (url.pathname === '/logfire-proxy/v1/traces') {
+    if (request.method !== 'POST' || request.headers.get('origin') !== request.nextUrl.origin) {
+      return new NextResponse('Forbidden', { status: 403 })
+    }
+    if (!(await isAuthenticated(request))) {
+      return new NextResponse('Unauthorized', { status: 401 })
+    }
+    if (!(await isWithinTelemetryLimit(request))) {
+      return new NextResponse('Too many requests', { status: 429 })
+    }
+
     const token = process.env.LOGFIRE_TOKEN
     if (!token) {
       return new NextResponse('Logfire token is not configured', { status: 500 })
     }
 
-    const requestHeaders = new Headers(request.headers)
-    requestHeaders.set('Authorization', token)
+    const requestHeaders = new Headers({ Authorization: token })
+    for (const name of ['content-type', 'content-encoding']) {
+      const value = request.headers.get(name)
+      if (value) requestHeaders.set(name, value)
+    }
 
     return NextResponse.rewrite(new URL('https://logfire-api.pydantic.dev/v1/traces'), {
       request: {
@@ -101,11 +126,11 @@ export default function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: '/logfire-proxy/:path*',
+  matcher: '/logfire-proxy/v1/traces',
 }
 ```
 
-Set `LOGFIRE_TOKEN` server-side to a Logfire write token. It can be the same write token value used in `OTEL_EXPORTER_OTLP_HEADERS`, but it must not use a `NEXT_PUBLIC_` prefix.
+Replace the two fail-closed adapter bodies with calls to the app's real authentication and rate-limit APIs before enabling the client component. Keep the exact path, method, origin, and forwarded-header allowlist. Forwarding all request headers could send application cookies or session credentials to Logfire. Set `LOGFIRE_TOKEN` server-side to a Logfire write token. It can be the same write token value used in `OTEL_EXPORTER_OTLP_HEADERS`, but it must not use a `NEXT_PUBLIC_` prefix.
 
 Create a client-only component:
 

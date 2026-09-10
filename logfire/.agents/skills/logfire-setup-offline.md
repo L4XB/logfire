@@ -515,6 +515,8 @@ Close with a final report built from what you just confirmed — the run name, e
 
 # Reference Files
 
+<a id="reference-logfire-instrumentation-references-auth-md"></a>
+
 ## logfire-instrumentation/references/auth.md
 
 # Authenticate and Select the Exact Project
