@@ -161,13 +161,15 @@ def test_ai_sdk_guidance_supports_installed_major_versions() -> None:
 def test_browser_and_python_logging_lifecycle_guidance_is_non_destructive() -> None:
     """Framework examples must survive remounts and preserve existing logging setup."""
     references = SKILLS_ROOT / 'logfire-instrumentation' / 'references'
-    for browser_doc in ('javascript/nextjs.md', 'javascript/react-browser.md'):
-        browser = (references / browser_doc).read_text(encoding='utf-8')
+    browsers = {
+        browser_doc: (references / browser_doc).read_text(encoding='utf-8')
+        for browser_doc in ('javascript/nextjs.md', 'javascript/react-browser.md')
+    }
+    for browser in browsers.values():
         assert 'useRef(false)' in browser
         assert 'if (!configured.current)' in browser
         assert 'void shutdown()' not in browser
-    react = (references / 'javascript/react-browser.md').read_text(encoding='utf-8')
-    assert 'but not in the root provider effect above' in react
+    assert 'but not in the root provider effect above' in browsers['javascript/react-browser.md']
 
     logging = (references / 'python/logging-patterns.md').read_text(encoding='utf-8')
     assert 'getLogger().addHandler(logfire.LogfireLoggingHandler())' in logging

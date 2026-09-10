@@ -139,7 +139,8 @@ def test_infrastructure_skill_uses_runnable_cost_conscious_collector_defaults() 
     skill_root = REPO_ROOT / 'logfire' / '.agents' / 'skills' / 'logfire-infrastructure'
     reference = (skill_root / 'references' / 'collector' / 'host-and-infra-metrics.md').read_text()
 
-    assert "Authorization: 'Bearer ${env:LOGFIRE_TOKEN}'" in reference
+    assert "Authorization: '${env:LOGFIRE_TOKEN}'" in reference
+    assert 'Bearer ${env:LOGFIRE_TOKEN}' not in reference
     assert "write token created by the authentication flow's `projects use`" in reference
     assert 'Create a write token in the Logfire UI' not in reference
     assert "endpoint: '<selected-logfire-origin>'" in reference
