@@ -94,7 +94,11 @@ export default async function proxy(request: NextRequest) {
   const url = request.nextUrl.clone()
 
   if (url.pathname === '/logfire-proxy/v1/traces') {
-    if (request.method !== 'POST' || request.headers.get('origin') !== request.nextUrl.origin) {
+    const allowedOrigin = process.env.LOGFIRE_PROXY_ALLOWED_ORIGIN
+    if (!allowedOrigin) {
+      return new NextResponse('Logfire proxy origin is not configured', { status: 500 })
+    }
+    if (request.method !== 'POST' || request.headers.get('origin') !== allowedOrigin) {
       return new NextResponse('Forbidden', { status: 403 })
     }
     if (!(await isAuthenticated(request))) {
@@ -130,7 +134,7 @@ export const config = {
 }
 ```
 
-Replace the two fail-closed adapter bodies with calls to the app's real authentication and rate-limit APIs before enabling the client component. Keep the exact path, method, origin, and forwarded-header allowlist. Forwarding all request headers could send application cookies or session credentials to Logfire. Set `LOGFIRE_TOKEN` server-side to a Logfire write token. It can be the same write token value used in `OTEL_EXPORTER_OTLP_HEADERS`, but it must not use a `NEXT_PUBLIC_` prefix.
+Replace the two fail-closed adapter bodies with calls to the app's real authentication and rate-limit APIs before enabling the client component. Set `LOGFIRE_PROXY_ALLOWED_ORIGIN` to the app's public origin, such as `https://app.example.com`, with no trailing slash. An explicit origin keeps this check correct behind a reverse proxy or content delivery network (CDN). Keep the exact path, method, origin, and forwarded-header allowlist. Forwarding all request headers could send application cookies or session credentials to Logfire. Set `LOGFIRE_TOKEN` server-side to a Logfire write token. It can be the same write token value used in `OTEL_EXPORTER_OTLP_HEADERS`, but it must not use a `NEXT_PUBLIC_` prefix.
 
 Create a client-only component:
 

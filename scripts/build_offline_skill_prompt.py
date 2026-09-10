@@ -58,6 +58,8 @@ MANDATORY_REFERENCES = [
 RELATIVE_MARKDOWN_LINK = re.compile(
     r'(?P<prefix>\]\()(?P<target>\.\.?/[^)#\s]+\.md)(?P<fragment>#[^)\s]+)?(?P<suffix>\))'
 )
+MARKDOWN_HEADING = re.compile(r'^(?P<marks>#{1,6})\s+(?P<title>.+)$')
+MARKDOWN_FENCE = re.compile(r'^(?P<marker>`{3,}|~{3,})')
 
 
 class BuildOfflinePromptError(RuntimeError):
@@ -93,6 +95,43 @@ def _reference_anchor(relative: str) -> str:
     return f'reference-{slug}'
 
 
+def _reference_section_anchor(relative: str, fragment: str) -> str:
+    """Qualify a source heading fragment with its inlined reference file."""
+    return f'{_reference_anchor(relative)}--{fragment.removeprefix("#")}'
+
+
+def _markdown_heading_slug(title: str) -> str:
+    """Approximate GitHub's Markdown heading fragment for reference source headings."""
+    without_links = re.sub(r'\[([^]]+)]\([^)]+\)', r'\1', title)
+    return ''.join(
+        character for character in without_links.casefold() if character.isalnum() or character in ' _-'
+    ).replace(' ', '-')
+
+
+def _qualify_reference_headings(text: str, relative: str) -> str:
+    """Add collision-free aliases for headings inside one flattened reference file."""
+    occurrences: dict[str, int] = {}
+    fence: tuple[str, int] | None = None
+    rendered: list[str] = []
+    for line in text.splitlines(keepends=True):
+        fence_match = MARKDOWN_FENCE.match(line.lstrip())
+        if fence_match:
+            marker = fence_match.group('marker')
+            if fence is None:
+                fence = marker[0], len(marker)
+            elif marker[0] == fence[0] and len(marker) >= fence[1]:
+                fence = None
+        elif fence is None and (heading := MARKDOWN_HEADING.fullmatch(line.rstrip('\r\n'))):
+            slug = _markdown_heading_slug(heading.group('title'))
+            occurrence = occurrences.get(slug, 0)
+            occurrences[slug] = occurrence + 1
+            fragment = slug if occurrence == 0 else f'{slug}-{occurrence}'
+            anchor = _reference_section_anchor(relative, fragment)
+            rendered.append(f'<a id="{anchor}"></a>\n\n')
+        rendered.append(line)
+    return ''.join(rendered)
+
+
 def _rewrite_public_links_for_offline_bundle(
     text: str,
     *,
@@ -123,7 +162,10 @@ def _rewrite_public_links_for_offline_bundle(
             resolved = posixpath.normpath((source_path.parent / target).as_posix())
             if resolved not in bundled_references:
                 return match.group(0)
-            destination = match.group('fragment') or f'#{_reference_anchor(resolved)}'
+            fragment = match.group('fragment')
+            destination = (
+                f'#{_reference_section_anchor(resolved, fragment)}' if fragment else f'#{_reference_anchor(resolved)}'
+            )
             return f'{match.group("prefix")}{destination}{match.group("suffix")}'
 
         text = RELATIVE_MARKDOWN_LINK.sub(replace_relative_link, text)
@@ -162,6 +204,7 @@ def _render_appendix(name: str, *, bundled_references: frozenset[str]) -> str:
             source_path=PurePosixPath(relative_path),
             bundled_references=bundled_references,
         )
+        content = _qualify_reference_headings(content, relative_path)
         parts.append(f'<a id="{_reference_anchor(relative_path)}"></a>\n\n## {relative}\n\n{content}')
     return '\n\n'.join(parts)
 

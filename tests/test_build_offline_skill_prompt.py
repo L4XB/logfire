@@ -6,7 +6,9 @@ from scripts.build_offline_skill_prompt import (
     PUBLIC_SKILLS_ROOT,
     SKILL_ORDER,
     SKILLS_ROOT,
+    _qualify_reference_headings,  # pyright: ignore[reportPrivateUsage]
     _reference_anchor,  # pyright: ignore[reportPrivateUsage]
+    _reference_section_anchor,  # pyright: ignore[reportPrivateUsage]
     _rewrite_public_links_for_offline_bundle,  # pyright: ignore[reportPrivateUsage]
     build,
 )
@@ -71,6 +73,10 @@ def test_full_build_has_no_dead_reference_links() -> None:
         assert f'<a id="{_reference_anchor(heading)}"></a>' in full
     anchors = [_reference_anchor(heading) for heading in headings]
     assert len(anchors) == len(set(anchors)), 'reference paths produced colliding appendix anchors'
+    for anchor in re.findall(r'\]\(#(reference-[^)]+)\)', full):
+        assert f'<a id="{anchor}"></a>' in full, f'generated link has no target: {anchor}'
+    all_anchors = re.findall(r'<a id="([^"]+)"></a>', full)
+    assert len(all_anchors) == len(set(all_anchors)), 'generated appendix anchors are not unique'
 
 
 def test_reference_links_inside_appendix_resolve_to_inlined_anchors() -> None:
@@ -96,6 +102,29 @@ def test_reference_links_inside_appendix_resolve_to_inlined_anchors() -> None:
     )
 
 
+def test_reference_link_fragments_are_qualified_by_their_file() -> None:
+    """A section link must not collide with an earlier heading in the flat bundle."""
+    reference = 'logfire-instrumentation/references/python/logging-patterns.md'
+    rewritten = _rewrite_public_links_for_offline_bundle(
+        '[metrics](./references/python/logging-patterns.md#custom-metrics)',
+        source_path=PurePosixPath('logfire-instrumentation/SKILL.md'),
+        bundled_references=frozenset({reference}),
+    )
+
+    anchor = _reference_section_anchor(reference, '#custom-metrics')
+    assert rewritten == f'[metrics](#{anchor})'
+    assert f'<a id="{anchor}"></a>' in build(include_references=True)
+
+
+def test_reference_heading_aliases_do_not_rewrite_code_fences() -> None:
+    """Shell comments and similar code must not become anchors in generated examples."""
+    source = '# Real heading\n\n```sh\n# not a heading\n```\n'
+    qualified = _qualify_reference_headings(source, 'skill/references/example.md')
+
+    assert qualified.endswith('```sh\n# not a heading\n```\n')
+    assert qualified.count('<a id=') == 1
+
+
 def test_nextjs_browser_proxy_example_fails_closed() -> None:
     """The setup prompt must not publish an unauthenticated credentialed proxy."""
     nextjs = (SKILLS_ROOT / 'logfire-instrumentation' / 'references' / 'javascript' / 'nextjs.md').read_text(
@@ -108,6 +137,19 @@ def test_nextjs_browser_proxy_example_fails_closed() -> None:
         assert f'status: {status}' in nextjs
     assert 'new Headers(request.headers)' not in nextjs
     assert "['content-type', 'content-encoding']" in nextjs
+    assert 'LOGFIRE_PROXY_ALLOWED_ORIGIN' in nextjs
+    assert 'request.nextUrl.origin' not in nextjs
+
+
+def test_ai_sdk_guidance_supports_installed_major_versions() -> None:
+    """The setup prompt must not apply the removed version 6 telemetry path to version 7."""
+    ai_sdk = (SKILLS_ROOT / 'logfire-instrumentation' / 'references' / 'javascript' / 'ai-sdk.md').read_text(
+        encoding='utf-8'
+    )
+
+    for marker in ('@ai-sdk/otel', 'registerTelemetry(new OpenTelemetry())', 'telemetry:', 'experimental_telemetry:'):
+        assert marker in ai_sdk
+    assert 'Do not upgrade the AI SDK as part of instrumentation.' in ai_sdk
 
 
 def test_build_rewrites_public_links_only_for_inlined_skills() -> None:
