@@ -151,6 +151,12 @@ def test_ai_sdk_guidance_supports_installed_major_versions() -> None:
         assert marker in ai_sdk
     assert 'Do not upgrade the AI SDK as part of instrumentation.' in ai_sdk
 
+    troubleshooting = (
+        SKILLS_ROOT / 'logfire-instrumentation' / 'references' / 'javascript' / 'verification-troubleshooting.md'
+    ).read_text(encoding='utf-8')
+    assert 'AI SDK 7' in troubleshooting
+    assert 'AI SDK 5/6' in troubleshooting
+
 
 def test_browser_and_python_logging_lifecycle_guidance_is_non_destructive() -> None:
     """Framework examples must survive remounts and preserve existing logging setup."""
