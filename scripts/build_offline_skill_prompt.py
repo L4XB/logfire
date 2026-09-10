@@ -119,7 +119,7 @@ def _qualify_reference_headings(text: str, relative: str) -> str:
             marker = fence_match.group('marker')
             if fence is None:
                 fence = marker[0], len(marker)
-            elif marker[0] == fence[0] and len(marker) >= fence[1]:
+            elif marker[0] == fence[0] and len(marker) >= fence[1] and not line.lstrip()[len(marker) :].strip():
                 fence = None
         elif fence is None and (heading := MARKDOWN_HEADING.fullmatch(line.rstrip('\r\n'))):
             slug = _markdown_heading_slug(heading.group('title'))

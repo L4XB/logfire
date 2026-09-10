@@ -19,24 +19,27 @@ For React, add a provider mounted once near the app root:
 ```tsx
 import { getWebAutoInstrumentations } from '@opentelemetry/auto-instrumentations-web'
 import * as logfire from '@pydantic/logfire-browser'
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 
 export function LogfireProvider({ children }: { children: ReactNode }) {
-  useEffect(() => {
-    const shutdown = logfire.configure({
-      traceUrl: '/logfire-proxy/v1/traces',
-      serviceName: 'web-app',
-      instrumentations: [getWebAutoInstrumentations()],
-    })
+  const configured = useRef(false)
 
-    return () => {
-      void shutdown()
+  useEffect(() => {
+    if (!configured.current) {
+      logfire.configure({
+        traceUrl: '/logfire-proxy/v1/traces',
+        serviceName: 'web-app',
+        instrumentations: [getWebAutoInstrumentations()],
+      })
+      configured.current = true
     }
   }, [])
 
   return children
 }
 ```
+
+Mount this provider once at the app root and do not return the asynchronous SDK cleanup from its effect. The ref prevents React Strict Mode's development-only second effect setup from configuring Logfire twice. Tests, previews, or app shells that replace the whole telemetry setup should await the cleanup returned by `configure()` before configuring a replacement.
 
 For non-React browser entrypoints, run `configure()` from the client entry file before adding manual spans.
 

@@ -143,24 +143,27 @@ Create a client-only component:
 
 import { getWebAutoInstrumentations } from '@opentelemetry/auto-instrumentations-web'
 import * as logfire from '@pydantic/logfire-browser'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 
 export function ClientInstrumentation() {
-  useEffect(() => {
-    const shutdown = logfire.configure({
-      traceUrl: '/logfire-proxy/v1/traces',
-      serviceName: 'nextjs-browser',
-      instrumentations: [getWebAutoInstrumentations()],
-    })
+  const configured = useRef(false)
 
-    return () => {
-      void shutdown()
+  useEffect(() => {
+    if (!configured.current) {
+      logfire.configure({
+        traceUrl: '/logfire-proxy/v1/traces',
+        serviceName: 'nextjs-browser',
+        instrumentations: [getWebAutoInstrumentations()],
+      })
+      configured.current = true
     }
   }, [])
 
   return null
 }
 ```
+
+Mount this component once at the app root and do not return the asynchronous SDK cleanup from its effect. The ref prevents React Strict Mode's development-only second effect setup from configuring Logfire twice. Tests, previews, or app shells that replace the whole telemetry setup should await the cleanup returned by `configure()` before configuring a replacement.
 
 If importing the component from server-rendered code, use `next/dynamic` with `ssr: false`.
 

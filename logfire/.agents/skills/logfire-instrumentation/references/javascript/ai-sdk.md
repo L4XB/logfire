@@ -60,6 +60,8 @@ Both version-specific paths apply to AI SDK operations that emit telemetry, incl
 
 Use `functionId` to distinguish use cases and `metadata` for bounded, non-sensitive labels. On AI SDK 7 use `telemetry`; on versions 5 and 6 use `experimental_telemetry` and include `isEnabled: true`:
 
+AI SDK 7:
+
 ```ts
 await generateText({
   model,
@@ -73,17 +75,49 @@ await generateText({
 })
 ```
 
+AI SDK 5 or 6:
+
+```ts
+await generateText({
+  model,
+  prompt,
+  experimental_telemetry: {
+    functionId: 'support-reply',
+    isEnabled: true,
+    metadata: {
+      tenant: tenantSlug,
+    },
+  },
+})
+```
+
 Do not put secrets, full prompts, raw emails, access tokens, or large payloads in metadata. The AI SDK may already emit prompt and response data depending on provider and call type.
 
 ## Tool Calls
 
 When tools are used, the same version-specific telemetry setup captures model calls and tool spans:
 
+AI SDK 7:
+
 ```ts
 const result = await generateText({
   model,
   telemetry: {
     functionId: 'weather-answer',
+  },
+  tools,
+  prompt,
+})
+```
+
+AI SDK 5 or 6:
+
+```ts
+const result = await generateText({
+  model,
+  experimental_telemetry: {
+    functionId: 'weather-answer',
+    isEnabled: true,
   },
   tools,
   prompt,

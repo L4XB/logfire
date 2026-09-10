@@ -118,10 +118,10 @@ def test_reference_link_fragments_are_qualified_by_their_file() -> None:
 
 def test_reference_heading_aliases_do_not_rewrite_code_fences() -> None:
     """Shell comments and similar code must not become anchors in generated examples."""
-    source = '# Real heading\n\n```sh\n# not a heading\n```\n'
+    source = '# Real heading\n\n```sh\n```python\n# not a heading\n```\n'
     qualified = _qualify_reference_headings(source, 'skill/references/example.md')
 
-    assert qualified.endswith('```sh\n# not a heading\n```\n')
+    assert qualified.endswith('```sh\n```python\n# not a heading\n```\n')
     assert qualified.count('<a id=') == 1
 
 
@@ -150,6 +150,20 @@ def test_ai_sdk_guidance_supports_installed_major_versions() -> None:
     for marker in ('@ai-sdk/otel', 'registerTelemetry(new OpenTelemetry())', 'telemetry:', 'experimental_telemetry:'):
         assert marker in ai_sdk
     assert 'Do not upgrade the AI SDK as part of instrumentation.' in ai_sdk
+
+
+def test_browser_and_python_logging_lifecycle_guidance_is_non_destructive() -> None:
+    """Framework examples must survive remounts and preserve existing logging setup."""
+    references = SKILLS_ROOT / 'logfire-instrumentation' / 'references'
+    for browser_doc in ('javascript/nextjs.md', 'javascript/react-browser.md'):
+        browser = (references / browser_doc).read_text(encoding='utf-8')
+        assert 'useRef(false)' in browser
+        assert 'if (!configured.current)' in browser
+        assert 'void shutdown()' not in browser
+
+    logging = (references / 'python/logging-patterns.md').read_text(encoding='utf-8')
+    assert 'getLogger().addHandler(logfire.LogfireLoggingHandler())' in logging
+    assert "'disable_existing_loggers': False" in logging
 
 
 def test_build_rewrites_public_links_only_for_inlined_skills() -> None:
