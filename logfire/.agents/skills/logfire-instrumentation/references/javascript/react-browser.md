@@ -78,6 +78,6 @@ window.addEventListener('unhandledrejection', (event) => {
 
 - Configure only in browser runtime code. Avoid importing `@pydantic/logfire-browser` from SSR modules.
 - Use `diagLogLevel: logfire.DiagLogLevel.ALL` only during local troubleshooting.
-- Browser `configure()` returns an async cleanup function. Use it in tests and providers.
+- Browser `configure()` returns an async cleanup function. Await it in tests, previews, or app shells that intentionally replace the telemetry setup, but not in the root provider effect above.
 - Browser does not install automatic pending-span processing; call `startPendingSpan()` explicitly for long operations.
 - Avoid high-volume spans for every mouse movement, render, or keystroke.

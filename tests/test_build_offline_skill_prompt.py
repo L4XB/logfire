@@ -166,10 +166,13 @@ def test_browser_and_python_logging_lifecycle_guidance_is_non_destructive() -> N
         assert 'useRef(false)' in browser
         assert 'if (!configured.current)' in browser
         assert 'void shutdown()' not in browser
+    react = (references / 'javascript/react-browser.md').read_text(encoding='utf-8')
+    assert 'but not in the root provider effect above' in react
 
     logging = (references / 'python/logging-patterns.md').read_text(encoding='utf-8')
     assert 'getLogger().addHandler(logfire.LogfireLoggingHandler())' in logging
     assert "'disable_existing_loggers': False" in logging
+    assert 'The `root.handlers` list replaces existing root handlers' in logging
 
 
 def test_framework_guidance_uses_supported_shutdown_and_authentication_shapes() -> None:
@@ -178,6 +181,8 @@ def test_framework_guidance_uses_supported_shutdown_and_authentication_shapes() 
     nextjs = (references / 'javascript/nextjs.md').read_text(encoding='utf-8')
     assert 'Import this Client Component normally' in nextjs
     assert 'put that dynamic import in another Client Component' in nextjs
+    assert 'Next.js 13.3 through 13.4.1 can drop the request body' in nextjs
+    assert 'Do not upgrade Next.js only to add instrumentation.' in nextjs
 
     rust = (references / 'rust/patterns.md').read_text(encoding='utf-8')
     instrumentation = (SKILLS_ROOT / 'logfire-instrumentation' / 'SKILL.md').read_text(encoding='utf-8')

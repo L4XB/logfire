@@ -74,6 +74,8 @@ npm install @pydantic/logfire-browser @opentelemetry/auto-instrumentations-web
 
 Create a proxy file in the project root or `src` directory. For Next.js 16 and later use `proxy.ts`. For older apps that already use `middleware.ts`, follow the existing file convention unless the app has migrated to `proxy.ts`.
 
+Check the installed Next.js version before using the external rewrite below. Next.js 13.3 through 13.4.1 can drop the request body when an external rewrite replaces headers. For those versions, keep browser tracing disabled or use an authenticated Route Handler that explicitly forwards a bounded request body. Do not upgrade Next.js only to add instrumentation.
+
 The proxy below fails closed until you connect its two adapter functions to the app's existing server-side authentication and rate limiter. Do not replace either `return false` with `return true`. If the app has no authentication or rate limiter to reuse, stop at server-side tracing and explain why browser tracing was not added.
 
 ```ts

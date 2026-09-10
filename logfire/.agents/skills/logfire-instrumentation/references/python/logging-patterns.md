@@ -56,7 +56,7 @@ getLogger().addHandler(logfire.LogfireLoggingHandler())
 
 This explicitly adds the Logfire handler even when the application configured other root handlers first. Keep those handlers unless the user asks to replace them.
 
-Or with `dictConfig`:
+If the application already owns its complete `dictConfig`, add Logfire to that configuration. The `root.handlers` list replaces existing root handlers, so include every intended console, file, and Logfire handler there. This minimal example intentionally makes Logfire the only root handler:
 
 ```python
 from logging.config import dictConfig
